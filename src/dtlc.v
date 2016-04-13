@@ -43,10 +43,11 @@ Check expr.
 
 (*Check Lambda ((Str("x"), Universe 0, (Var (Str "x+5")) )).*)
 
-Definition context := list (variable * expr).
+Definition context := list (variable * (expr * option expr)).
 Check context.
 
-Fixpoint assoc_opt (x: variable) (ctx: context) {struct ctx}: option expr :=
+
+Fixpoint assoc_opt (x: variable) (ctx: list (variable * expr)) {struct ctx}: option expr :=
   match ctx with
     | nil => None
     | ((v, a) :: ctx') => 
@@ -56,7 +57,7 @@ Fixpoint assoc_opt (x: variable) (ctx: context) {struct ctx}: option expr :=
         | 0 => Some a
         | _ => assoc_opt x ctx'
       end)
-      | Gensym (v1, t1), Gensym (v2, t2) => 
+      | (Gensym (v1, t1)), Gensym (v2, t2) => 
       (match (string_compare v1 v2) with
         | 0 => 
         (match nat_compare t1 t2 with
@@ -70,25 +71,35 @@ Fixpoint assoc_opt (x: variable) (ctx: context) {struct ctx}: option expr :=
   end.
 Check assoc_opt.
 
-Definition lookup_ty_opt (x: variable) (ctx: context) := (assoc_opt x ctx).
-Check lookup_ty_opt.
-
 (*
-Definition l := ((Str "c", Universe 5%nat) :: ((Gensym ("b", 2%nat)), Universe 0%nat) :: 
-  (Str "a", Universe 10%nat):: ((Gensym ("d", 20%nat)), Universe 21%nat) :: nil).
-Eval compute in assoc (Str "c") l.
-Eval compute in assoc (Gensym ("b", 2%nat)) l.
-Eval compute in assoc (Gensym ("d", 20%nat)) l.
-Eval compute in assoc (Str "a") l.
+Definition l := ((Str "c", (Universe 5%nat, None)) :: ((Gensym ("b", 2%nat)), (Universe 0%nat, Some (Var (Str "xyx")))) :: 
+  (Str "a", (Universe 10%nat, None)):: ((Gensym ("d", 20%nat)), (Universe 21%nat, None)) :: nil).
+Eval compute in assoc_opt2 (Str "c") l.
+Eval compute in assoc_opt2 (Gensym ("b", 2%nat)) l.
+Eval compute in assoc_opt1 (Gensym ("d", 20%nat)) l.
+Eval compute in assoc_opt2 (Str "a") l.
 *)
 
-Definition extend (x: variable) (t: expr) (ctx: context) := (x, t) :: ctx.
-Check extend.
 (*
-Definition l := ((Str "c", Universe 5%nat) :: ((Gensym ("b", 2%nat)), Universe 0%nat) :: 
-  (Str "a", Universe 10%nat):: ((Gensym ("d", 20%nat)), Universe 21%nat) :: nil).
-Eval compute in extend (Str "a") (Universe 10) l.
-Eval compute in extend (Gensym ("d", 20%nat)) (Universe 21) l. 
+Definition l := ((Str "c", (Universe 5%nat, None)) :: ((Gensym ("b", 2%nat)), (Universe 0%nat, Some (Var (Str "xyx")))) :: 
+  (Str "a", (Universe 10%nat, None)):: ((Gensym ("d", 20%nat)), (Universe 21%nat, None)) :: nil).
+Eval compute in lookup_ty_opt (Str "c") l.
+Eval compute in lookup_val_opt (Str "c") l.
+Eval compute in lookup_val_opt (Gensym ("b", 2%nat)) l.
+Eval compute in lookup_val_opt (Gensym ("b", 3%nat)) l.
+Eval compute in lookup_ty_opt (Gensym ("b", 3%nat)) l.
+Eval compute in lookup_ty_opt (Gensym ("b", 2%nat)) l.
+*)
+
+Definition extend (x: variable) (t: expr) (t': option expr) (ctx: context) := (x, (t, t')) :: ctx.
+Check extend.
+
+(*
+Definition l := ((Str "c", (Universe 5%nat, None)) :: ((Gensym ("b", 2%nat)), (Universe 0%nat, Some (Var (Str "xyx")))) :: 
+  (Str "a", (Universe 10%nat, None)):: ((Gensym ("d", 20%nat)), (Universe 21%nat, None)) :: nil).
+Eval compute in extend (Str "a") (Universe 10) None l.
+Eval compute in extend (Str "u") (Lambda ((Gensym ("d", 20%nat)), (Universe 21), (Var (Str "burak"))))
+(Some ((Pi ((Str("a"), Universe 0, (Var (Str "a+325")) ))))) l.
 *)
 
 Definition incr (n: nat) := S n.
@@ -113,18 +124,54 @@ Fixpoint subst (s: list (variable * expr)) (e: expr) {struct e}: expr :=
       | App (e1, e2)     => App (subst s e1, subst s e2)
     end.
 Check subst.
+
+
 (*
-Definition l := ((Str "c", Universe 5%nat) :: ((Gensym ("b", 2%nat)), Universe 0%nat) :: 
-  (Str "a", Universe 10%nat):: ((Gensym ("d", 20%nat)), Universe 21%nat) :: nil).
-Eval compute in subst l (Lambda ((Str("a"), Universe 0, (Var (Str "a+5")) ))).
-Eval compute in subst l (Pi ((Str("a"), Universe 0, (Var (Str "a+5")) ))).
-Eval compute in subst l (App ((Lambda ((Str("a"), Universe 0, (Var (Str "a")) ))), (Lambda ((Str("b"), Universe 2, (Var (Str "a+5")) ))))).
+Definition l := ((Str "c", (Universe 5%nat, Some ((Lambda ((Str("a"), Universe 0, Var (Gensym ("b", 2%nat)) )))) ))
+:: ((Gensym ("b", 2%nat)), (Universe 0%nat, Some (Var (Str "xyx")))) 
+:: (Str "a", (Universe 10%nat, None)):: ((Gensym ("d", 20%nat)), (Universe 21%nat, None)) :: nil).
+Check l.
+
+Definition l2 := ((Lambda ((Str("a"), Universe 0, (Var (Str "a+325")) )))).
+Check l2.
+
+Eval compute in subst [(Str ("a+325"), ((Var (Gensym ("c", 2%nat)))))] l2.
 *)
+
+Fixpoint assoc_ctx_opt (x: variable) (ctx: context) {struct ctx}: (expr * option expr) :=
+  match ctx with
+    | nil => ((Var x), None)
+    | ((v, (a, b)) :: ctx') => 
+    (match v, x with
+      | Str v1, Str x1 => 
+      (match (string_compare v1 x1) with
+        | 0 => (a , b)
+        | _ => assoc_ctx_opt x ctx'
+      end)
+      | (Gensym (v1, t1)), Gensym (v2, t2) => 
+      (match (string_compare v1 v2) with
+        | 0 => 
+        (match nat_compare t1 t2 with
+          | 0 => (a, b)
+          | _ => assoc_ctx_opt x ctx'
+        end)
+        | _ => assoc_ctx_opt x ctx'
+        end)
+      | _, _ => assoc_ctx_opt x ctx'
+      end)
+  end.
+Check assoc_opt.
+
+Definition lookup_ty_opt (x: variable) (ctx: context) := fst (assoc_ctx_opt x ctx).
+Check lookup_ty_opt.
+
+Definition lookup_val_opt (x: variable) (ctx: context) := snd (assoc_ctx_opt x ctx).
+Check lookup_val_opt.
 
 Fixpoint normalize (ctx: context) (e: expr) {struct e}: expr :=
   match e with
     | Var x => 
-      (match lookup_ty_opt x ctx with
+      (match lookup_val_opt x ctx with
         | None    => Var x
         | Some e' => e' (* normalize ctx e' *)
      end)
@@ -136,15 +183,19 @@ Fixpoint normalize (ctx: context) (e: expr) {struct e}: expr :=
          | e1 => App (e1, u2)
         end)
     | Universe k       => Universe k
-    | Pi (x, t, e)     => Pi (let t := normalize ctx t in (x, t, (normalize (extend x t ctx) e)))
-    | Lambda (x, t, e) => Lambda (let t := normalize ctx t in (x, t, (normalize (extend x t ctx) e)))
+    | Pi (x, t, e)     => Pi (let t' := normalize ctx t in (x, t', (normalize (extend x t' None ctx) e)))
+    | Lambda (x, t, e) => Lambda (let t' := normalize ctx t in (x, t', (normalize (extend x t' None ctx) e)))
  end.
 Check normalize.
+
 (*
-Definition l := ((Str "c", Universe 5%nat) :: ((Gensym ("b", 2%nat)), Universe 0%nat) :: 
-  (Str "a", Universe 10%nat):: ((Gensym ("d", 20%nat)), Universe 21%nat) :: (Str "a+325", Universe 0) :: nil).
-Eval compute in normalize l (App ((Lambda ((Str("a"), Universe 0, (Var (Str "a+3250")) ))), (Var (Str "x")))). 
-Eval compute in normalize l (App ((Lambda ((Str("a"), Universe 0, (Var (Str "a")) ))), (Lambda ((Str("b"), Universe 2, (Var (Str "a+5")) ))))).
+Definition l := ((Str "c", (Universe 0%nat, None)) :: (Str "f", (Universe 0%nat, Some (Var (Str "cagin")))) ::
+  ((Gensym ("b", 2%nat)), (Universe 0%nat, None)) :: 
+  (Str "a", (Universe 0%nat, Some (Var (Str "Cagin ekici")))):: ((Gensym ("d", 0%nat)), (Universe 0%nat, None)) :: 
+  (Str "a+325", (Universe 0%nat, (Some (Var (Str "ekici"))))) :: nil).
+Eval compute in normalize l (Var (Str "a+325")).
+Eval compute in normalize l (App ((Lambda ((Str("x"), Universe 0, (Var (Str "a")) ))), (Var (Str "f")))).
+Eval compute in lookup_val_opt (Str "f") l.
 *)
 
 Fixpoint equal (ctx: context) (e1 e2: expr): bool :=
@@ -190,15 +241,15 @@ Check compare_universe.
 
 Fixpoint infer_type_opt (ctx: context) (e: expr) :=
   match e with 
-    | Var x => lookup_ty_opt x ctx
+    | Var x => Some (lookup_ty_opt x ctx)
     | Universe k => Some (Universe (k + 1))
     | Pi (x, t1, t2) =>
       let k1 := infer_type_opt ctx t1 in
-      let k2 := infer_type_opt (extend x t1 ctx) t2 in
+      let k2 := infer_type_opt (extend x t1 (None) ctx) t2 in
         (compare_universe k1 k2) (* Universe (max k1 k2) *)
     | Lambda (x, t, e) => 
       let k := infer_type_opt ctx t in
-        let ctx' := (extend x t ctx) in
+        let ctx' := (extend x t (None) ctx) in
           let te := infer_type_opt ctx' e in
           (match te with
             | Some a => Some (Pi (x, t, a))
@@ -223,10 +274,13 @@ Fixpoint infer_type_opt (ctx: context) (e: expr) :=
 Check infer_type_opt.
 
 (*
-Definition l := ((Str "c", Universe 0%nat) :: ((Gensym ("b", 2%nat)), Universe 0%nat) :: 
-  (Str "a", Universe 10%nat):: ((Gensym ("d", 20%nat)), Universe 21%nat) :: (Str "a+325", Universe 200) :: nil).
+Definition l := ((Str "c", (Universe 0%nat, None)) :: (Str "f", (Universe 0%nat, Some (Var (Str "cagin")))) ::
+  ((Gensym ("b", 2%nat)), (Universe 0%nat, None)) :: 
+  (Str "a", (Universe 0%nat, Some (Var (Str "Cagin ekici")))):: ((Gensym ("d", 0%nat)), (Universe 0%nat, None)) :: 
+  (Str "a+325", (Universe 0%nat, (Some (Var (Str "ekici"))))) :: nil).
 Eval compute in infer_type_opt l ((Lambda ((Str("a"), Universe 0, (Var (Str "a+325")) )))).
 Eval compute in infer_type_opt l ((Pi ((Str("a"), Universe 0, (Var (Str "a+325")) )))).
+Eval compute in infer_type_opt l (Universe 10).
 Eval compute in infer_type_opt l  (App ((Lambda ((Str("a"), Universe 0, (Var (Str "a+325")) ))),  (Var (Str "c")))).
 *)
 
