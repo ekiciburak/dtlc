@@ -3,8 +3,10 @@ Require Import Program Coq.Setoids.Setoid.
 Require Import Coq.ZArith.BinInt.
 Require Import List.
 
+(*
 Require Import ZArith.
 Open Scope Z_scope.
+*)
 
 Require Import Arith.
 Require Import Ascii.
@@ -51,25 +53,25 @@ Fixpoint string_compare_b (s1 s2: string): bool :=
     end
   end.
 
-Fixpoint nat_compare (n m: nat) : Z :=
+Fixpoint nat_compare (n m: nat) : nat :=
   match n with
     | 0%nat  => 
     match m with
       | 0%nat => 0
-      | _ => -1
+      | _ => 1
     end
     | S x => 
     match m with
-      | 0%nat => 1
+      | 0%nat => 2
       | S y => nat_compare x y
     end
   end.
 
-Fixpoint string_compare (s1 s2: string): Z :=
+Fixpoint string_compare (s1 s2: string): nat :=
   match s1, s2 with
     | EmptyString,  EmptyString  => 0
-    | EmptyString,  String a s2' => -1
-    | String a s1', EmptyString  => 1
+    | EmptyString,  String a s2' => 1
+    | String a s1', EmptyString  => 2
     | String a s1', String b s2' =>
     match ascii_dec a b with
       | left _  => string_compare s1' s2'

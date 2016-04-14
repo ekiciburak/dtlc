@@ -3,8 +3,10 @@ Require Import Program Coq.Setoids.Setoid.
 Require Import Coq.ZArith.BinInt.
 Require Import List.
 
+(*
 Require Import ZArith.
 Open Scope Z_scope.
+*)
 
 Require Import Arith.
 Require Import Ascii.
@@ -211,7 +213,6 @@ Fixpoint infer_type_opt (ctx: context) (e: expr) :=
            end)
    end.
 Check infer_type_opt.
-
 
 End Make.
 
